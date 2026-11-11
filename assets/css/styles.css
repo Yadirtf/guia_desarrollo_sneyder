@@ -274,6 +274,57 @@ table.nice th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-t
 .visual { margin-top: 12px; padding: 12px; border-radius: 16px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.07); animation: stepIn .6s var(--spring) both; }
 .visual svg { display: block; width: 100%; height: auto; }
 
+/* ---------- Pizarra (tablero del profe) ---------- */
+.board {
+  margin-top: 12px; border-radius: 18px; overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 20% 0%, rgba(255,255,255,.06), transparent 55%),
+    linear-gradient(160deg, #10221a, #0b1612 60%, #091310);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 40px rgba(0,0,0,.6), 0 10px 30px -14px rgba(0,0,0,.9);
+  position: relative;
+}
+.board::after { /* polvo de tiza */
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.board-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 0 14px; font-family: Caveat, "Comic Sans MS", cursive; font-size: 19px; font-weight: 700; color: rgba(255,255,255,.55); }
+.board-replay { border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #fff; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 15px; transition: transform .4s var(--spring); }
+.board-replay:hover { transform: rotate(-180deg); }
+.board-body { padding: 6px 16px 16px; color: #F4F1E6; overflow-x: auto; position: relative; z-index: 1; }
+.board-body .katex { color: #F4F1E6; font-size: 1.12em; }
+.bi { margin: 8px 0; }
+.bl-tex { white-space: nowrap; }
+@media (max-width: 760px) { .step { padding: 10px; gap: 8px; } .board-body { padding: 4px 10px 12px; } .step .board { margin-left: -34px; } }
+.board-body.play .bi { animation: chalk .6s cubic-bezier(.45,.05,.4,1) both; animation-delay: calc(var(--d) * .42s); }
+@keyframes chalk {
+  0% { clip-path: inset(-10px 100% -10px 0); opacity: .3; }
+  100% { clip-path: inset(-10px -4px -10px 0); opacity: 1; }
+}
+.bnote { font-family: Caveat, "Comic Sans MS", cursive; font-size: 22px; line-height: 1.25; color: #FFE58A; }
+.bnote .katex { color: #FFE58A; font-size: .85em; }
+.arith { display: flex; width: fit-content; flex-direction: column; align-items: flex-end; padding: 4px 6px; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 21px; }
+.arith .bi { margin: 0; }
+.ar { display: flex; }
+.ar .c { display: inline-block; width: .72em; text-align: center; }
+.ar.rule { border-top: 2px solid rgba(244,241,230,.75); padding-top: 2px; margin-top: 2px; }
+.ar.part { color: #9AD8FF; }
+.ar.res { color: #7CF29A; font-weight: 700; }
+.ladder { display: flex; width: fit-content; flex-direction: column; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 19px; margin: 4px 0; }
+.ladder .bi { margin: 0; }
+.lr { display: flex; }
+.lr span { min-width: 54px; text-align: right; padding: 2px 12px 2px 0; }
+.lr span:last-child { border-left: 2px solid rgba(244,241,230,.75); text-align: left; padding-left: 12px; color: #FFD60A; min-width: 40px; }
+.galera { display: inline-flex; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 21px; }
+.galera .gd { border-left: 2px solid #F4F1E6; border-bottom: 2px solid #F4F1E6; padding: 0 10px; margin-left: 10px; }
+table.signs { border-collapse: collapse; font-size: 15px; }
+table.signs th, table.signs td { padding: 6px 12px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.12); white-space: nowrap; }
+table.signs td:first-child { text-align: left; }
+table.signs .w { background: rgba(48,209,88,.16); }
+table.signs .sp { color: #7CF29A; font-size: 20px; }
+table.signs .sm { color: #FF7A70; font-size: 20px; }
+.step .board .slot b { border-bottom-color: #FFD60A; }
+
 /* ---------- Quiz ---------- */
 .quiz-q { padding: 22px; }
 .quiz-q .qn { font-size: 12.5px; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: .08em; }
