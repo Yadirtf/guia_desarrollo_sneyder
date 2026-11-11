@@ -10,6 +10,8 @@ Página web de estudio para preparar el examen del **Plan de Apoyo de Matemátic
 | 4 | Desigualdades e inecuaciones | Analogía de la balanza + tabla de signos | Balanza de desigualdades · Parábola con solución |
 | 5 | Técnicas de conteo y probabilidad | Árbol de preguntas + método de casillas | "¿Qué fórmula uso?" · Calculadora de casillas |
 
+Cada paso trae una **pizarra animada** que escribe las operaciones línea por línea, como un profe en el tablero: multiplicaciones y sumas en columna, división larga cifra por cifra, factores primos, m.c.m., tabla de signos y casillas de conteo.
+
 Además incluye: quiz con retroalimentación por tema, **simulacro final** de 13 preguntas, **hoja de fórmulas** imprimible, progreso guardado en el navegador y **voz del profe** en español (Web Speech API, se activa con 🔊).
 
 ## Estructura
@@ -18,6 +20,7 @@ Además incluye: quiz con retroalimentación por tema, **simulacro final** de 13
 index.html               ← página principal (SPA con rutas #/…)
 assets/css/styles.css    ← estilo "liquid glass" sobre fondo negro
 assets/js/content.js     ← TODO el contenido pedagógico (teoría, ejercicios, quizzes)
+assets/js/boards.js      ← operaciones de la pizarra para cada paso
 assets/js/app.js         ← lógica: rutas, paso a paso, voz, laboratorios, quizzes
 assets/vendor/katex/     ← KaTeX 0.16.9 (fórmulas matemáticas), incluido localmente
 ```

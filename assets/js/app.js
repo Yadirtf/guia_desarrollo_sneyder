@@ -54,12 +54,15 @@
   /* Protege los < y > dentro de $...$ para que el HTML no los confunda con etiquetas */
   const prep = (html) => String(html).replace(/\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g, (m) => m.replace(/</g, "&lt;").replace(/>/g, "&gt;"));
 
+  const MACROS = { "\\hl": "\\color{FFD60A}{#1}", "\\bl": "\\color{64D2FF}{#1}", "\\gr": "\\color{30D158}{#1}", "\\rd": "\\color{FF7A70}{#1}" };
   function typeset(el) {
     if (!el || !window.renderMathInElement) return;
     try {
       window.renderMathInElement(el, {
         delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
         throwOnError: false,
+        strict: "ignore",
+        macros: Object.assign({}, MACROS),
       });
     } catch (e) { console.warn(e); }
   }
@@ -349,6 +352,152 @@
     </svg>`;
   }
 
+  /* =========================================================
+     PIZARRA: escribe las operaciones como un profe en el tablero
+     ========================================================= */
+  const Board = (() => {
+    let d = 0; // orden de escritura
+    const item = (html, cls = "") => `<div class="bi ${cls}" style="--d:${d++}">${html}</div>`;
+    const cells = (s) => [...s].map((c) => `<span class="c">${c === " " ? "&nbsp;" : esc(c)}</span>`).join("");
+    const padL = (s, w) => " ".repeat(Math.max(0, w - [...s].length)) + s;
+    const arith = (rows) => {
+      const W = Math.max(...rows.map((r) => [...r.s].length));
+      return `<div class="arith">${rows.map((r) => item(cells(padL(r.s, W)), "ar " + (r.cls || ""))).join("")}</div>`;
+    };
+    const withComma = (digits, dec) => {
+      if (!dec) return digits;
+      const s = digits.padStart(dec + 1, "0");
+      return s.slice(0, -dec) + "," + s.slice(-dec);
+    };
+    const tex = (t) => item(`$\\displaystyle ${t}$`, "bl-tex");
+    const note = (t) => item(`✎ ${prep(t)}`, "bnote");
+
+    function mul(a, b) {
+      const da = (a.split(",")[1] || "").length, db = (b.split(",")[1] || "").length;
+      const A = BigInt(a.replace(",", "")), bd = String(BigInt(b.replace(",", "")));
+      const rows = [{ s: a }, { s: "× " + b }];
+      const res = (A * BigInt(bd)).toString();
+      if (bd.length > 1) {
+        [...bd].reverse().forEach((dg, i) => rows.push({ s: (A * BigInt(dg)).toString() + " ".repeat(i), cls: i === 0 ? "rule part" : "part" }));
+        rows.push({ s: res, cls: "rule res" });
+      } else rows.push({ s: res, cls: "rule res" });
+      let out = arith(rows);
+      if (bd.length > 1) out += note(`Multiplico ${String(A)} por cada cifra de ${bd}, de derecha a izquierda, corriendo un lugar cada vez, y luego sumo.`);
+      if (da + db) out += tex(`${da}+${db}=${da + db}\\text{ decimales}\\;\\Rightarrow\\;\\hl{${withComma(res, da + db).replace(",", "{,}")}}`);
+      return out;
+    }
+    function addSub(list, op) {
+      const dec = Math.max(...list.map((x) => (x.split(",")[1] || "").length));
+      const norm = list.map((x) => { const [i, f = ""] = x.split(","); return { i, f: f.padEnd(dec, "0") }; });
+      const vals = norm.map((n) => BigInt(n.i + n.f));
+      const total = op === "+" ? vals.reduce((s, v) => s + v, 0n) : vals[0] - vals.slice(1).reduce((s, v) => s + v, 0n);
+      const show = (n) => (dec ? `${n.i},${n.f}` : n.i);
+      const rows = norm.map((n, k) => ({ s: (k === norm.length - 1 ? (op === "+" ? "+ " : "− ") : "") + show(n) }));
+      rows.push({ s: withComma(total.toString(), dec), cls: "rule res" });
+      const padded = list.some((x) => (x.split(",")[1] || "").length < dec);
+      return arith(rows) + (padded ? note("Completo con ceros para que las comas queden una debajo de la otra.") : "");
+    }
+    function div(D, dv, decs) {
+      const s = String(D), dd = +dv;
+      const head = item(`<span class="galera"><span>${esc(s)}</span><span class="gd">${esc(dv)}</span></span>`, "bl-tex");
+      let rem = 0, q = "", started = false, out = "";
+      for (let i = 0; i < s.length; i++) {
+        if (started && rem === 0 && /^0+$/.test(s.slice(i))) {
+          const rest = s.slice(i); q += rest;
+          out += tex(`\\text{residuo 0: bajo los ceros que faltan}\\to\\;\\hl{${rest}}`);
+          break;
+        }
+        const cur = rem * 10 + +s[i], qd = Math.floor(cur / dd);
+        if (!started && qd === 0 && i < s.length - 1) { rem = cur; continue; }
+        const bring = started ? `\\text{bajo el }${s[i]}\\to\\;` : "";
+        started = true; q += qd; rem = cur - qd * dd;
+        out += tex(`${bring}${cur}\\div${dd}=\\hl{${qd}}\\quad ${qd}\\times${dd}=${qd * dd}\\quad ${cur}-${qd * dd}=\\bl{${rem}}`);
+      }
+      if (!q) q = "0";
+      if (decs > 0 && rem !== 0) {
+        q += ",";
+        for (let k = 0; k < decs && rem !== 0; k++) {
+          const cur = rem * 10, qd = Math.floor(cur / dd);
+          out += tex(`\\text{${k === 0 ? "pongo coma y " : ""}bajo un }0\\to\\;${cur}\\div${dd}=\\hl{${qd}}\\quad ${cur}-${qd * dd}=\\bl{${cur - qd * dd}}`);
+          q += qd; rem = cur - qd * dd;
+        }
+      }
+      return head + out + tex(`${s}\\div${dv}=\\gr{${q.replace(",", "{,}")}${rem !== 0 && decs > 0 ? "\\ldots" : ""}}`) + (rem !== 0 && decs === 0 ? "" : "");
+    }
+    function fact(n) {
+      n = +n; let x = n; const rows = []; const ps = [];
+      for (let p = 2; x > 1; ) { if (x % p === 0) { rows.push([x, p]); ps.push(p); x /= p; } else p++; }
+      rows.push([1, ""]);
+      const cnt = {}; ps.forEach((p) => (cnt[p] = (cnt[p] || 0) + 1));
+      const pw = Object.entries(cnt).map(([p, c]) => (c > 1 ? `${p}^{${c}}` : p)).join("\\cdot");
+      return `<div class="ladder">${rows.map(([a, p]) => item(`<span>${a}</span><span>${p}</span>`, "lr")).join("")}</div>` + tex(`${n}=${ps.join("\\cdot")}${ps.length > 1 ? "=" + pw : ""}`);
+    }
+    function mcm(list) {
+      let nums = list.split(",").map(Number); const rows = []; const ps = [];
+      while (nums.some((v) => v > 1)) {
+        let p = 2; while (!nums.some((v) => v % p === 0 && v > 1)) p++;
+        rows.push([nums.slice(), p]); ps.push(p);
+        nums = nums.map((v) => (v % p === 0 ? v / p : v));
+      }
+      rows.push([nums, ""]);
+      return `<div class="ladder">${rows.map(([vs, p]) => item(`${vs.map((v) => `<span>${v}</span>`).join("")}<span>${p}</span>`, "lr")).join("")}</div>` + tex(`\\text{mcm}=${ps.join("\\cdot")}=\\hl{${ps.reduce((a, b) => a * b, 1)}}`);
+    }
+    function sign(r1, r2, op) {
+      r1 = +r1; r2 = +r2;
+      const f = (r) => (r < 0 ? `x+${-r}` : `x-${r}`);
+      const pos = op.startsWith(">"), incl = op.includes("=");
+      const sg = (v) => (v > 0 ? `<b class="sp">+</b>` : `<b class="sm">−</b>`);
+      const cols = [[-1, -1], [1, -1], [1, 1]];
+      const want = cols.map(([a, b]) => (a * b > 0) === pos);
+      const head = [`$(-\\infty,${r1})$`, `$(${r1},${r2})$`, `$(${r2},\\infty)$`];
+      const th = `<tr><th></th>${head.map((h, i) => `<th class="${want[i] ? "w" : ""}">${h}</th>`).join("")}</tr>`;
+      const tr = (label, vals) => `<tr><td>${label}</td>${vals.map((v, i) => `<td class="${want[i] ? "w" : ""}">${sg(v)}</td>`).join("")}</tr>`;
+      const table = `<div class="table-wrap"><table class="signs">${th}${tr(`$${f(r1)}$`, cols.map((c) => c[0]))}${tr(`$${f(r2)}$`, cols.map((c) => c[1]))}${tr(`<b>Producto</b>`, cols.map((c) => c[0] * c[1]))}</table></div>`;
+      const o = incl ? "[" : "(", c = incl ? "]" : ")";
+      const sol = pos ? `(-\\infty,${r1}${c}\\cup${o}${r2},\\infty)` : `${o}${r1},${r2}${c}`;
+      return item(table, "bl-table") + note(`Queremos que el producto sea ${pos ? "positivo (+)" : "negativo (−)"}${incl ? " o cero" : ""}: columnas en verde.`) + tex(`\\gr{${sol}}`);
+    }
+    function slots(spec) {
+      const [v, l = ""] = spec.split("|"); const vals = v.split(","), labs = l.split(",");
+      const html = vals.map((x, i) => `${i ? '<span class="slot-op">×</span>' : ""}<div class="slot"><b>${x}</b><small>${esc(labs[i] || "")}</small></div>`).join("");
+      return item(`<div class="slots" style="margin:4px 0">${html}</div>`, "bl-slots");
+    }
+    function line(L) {
+      const m = /^(\w+):([\s\S]*)$/.exec(L);
+      const kind = m && ["mul", "add", "sub", "div", "fact", "mcm", "sign", "slots", "note"].includes(m[1]) ? m[1] : null;
+      if (!kind) return tex(L);
+      const arg = m[2];
+      if (kind === "note") return note(arg);
+      if (kind === "mul") { const [a, b] = arg.split("|"); return mul(a, b); }
+      if (kind === "add") return addSub(arg.split("|"), "+");
+      if (kind === "sub") return addSub(arg.split("|"), "-");
+      if (kind === "div") { const [a, b, k = "2"] = arg.split("|"); return div(a, b, +k); }
+      if (kind === "fact") return fact(arg);
+      if (kind === "mcm") return mcm(arg);
+      if (kind === "sign") { const [a, b, o] = arg.split("|"); return sign(a, b, o); }
+      if (kind === "slots") return slots(arg);
+    }
+    function auto(stepHtml) {
+      const segs = [];
+      String(stepHtml).replace(/\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g, (m, a, b) => { const t = (a || b).trim(); if (t.replace(/[\s{},]/g, "").length > 3) segs.push(t); });
+      return segs;
+    }
+    function html(exId, idx, stepHtml) {
+      const lines = ((window.BOARDS || {})[exId] || {})[idx] || auto(stepHtml);
+      if (!lines.length) return "";
+      d = 0;
+      const body = lines.map(line).join("");
+      return `<div class="board"><div class="board-head"><span>✍️ Pizarra</span><button class="board-replay" title="Volver a escribir" aria-label="Volver a escribir">↻</button></div><div class="board-body play">${body}</div></div>`;
+    }
+    function bind(root) {
+      $$(".board-replay", root).forEach((b) => b.onclick = () => {
+        const body = b.closest(".board").querySelector(".board-body");
+        body.classList.remove("play"); void body.offsetWidth; body.classList.add("play");
+      });
+    }
+    return { html, bind };
+  })();
+
   /* ---------------- Navegación ---------------- */
   function renderNav(route) {
     const items = [["#/", "Inicio"], ...MODS.map((m) => [`#/m/${m.id}`, `${m.emoji} ${m.num}`]), ["#/simulacro", "🏁 Simulacro"], ["#/formulas", "📋 Fórmulas"]];
@@ -562,9 +711,10 @@
         const s = e.steps[shown];
         const div = document.createElement("div");
         div.className = "step";
-        div.innerHTML = `<span class="sn">${shown + 1}</span><div class="sx">${prep(s)}</div>${speakBtn()}`;
+        div.innerHTML = `<span class="sn">${shown + 1}</span><div class="sx">${prep(s)}${Board.html(e.id, shown, s)}</div>${speakBtn()}`;
         stepsEl.appendChild(div);
         typeset(div);
+        Board.bind(div);
         const b = $(".speak-btn", div);
         b.onclick = () => Voice.toggle(`Paso ${+div.querySelector(".sn").textContent}. ` + html2say(s), { btn: b, el: div, label: `Paso ${div.querySelector(".sn").textContent}` });
         shown++;
